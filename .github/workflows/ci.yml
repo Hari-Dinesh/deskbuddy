@@ -1,0 +1,13 @@
+name: Build and test
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  macos:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash scripts/build.sh --universal
+      - run: bash scripts/test.sh
+      - run: bash -n scripts/*.sh
+      - run: lipo -archs .build/DeskBuddy.app/Contents/MacOS/DeskBuddy

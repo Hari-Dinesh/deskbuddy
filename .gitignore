@@ -1,0 +1,13 @@
+.build/
+.DS_Store
+*.app/
+*.zip
+*.dmg
+*.png
+*.jpg
+*.jpeg
+.env*
+*.p12
+*.key
+*.mobileprovision
+
