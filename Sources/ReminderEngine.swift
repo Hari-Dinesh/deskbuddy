@@ -1,15 +1,19 @@
 import Foundation
 
 enum ReminderKind: String, Codable, CaseIterable {
-    case water, breakfast, lunch, dinner
+    case water, breakfast, lunch, dinner, quick, meeting
     var title: String { rawValue.capitalized }
-    var symbol: String { self == .water ? "drop.fill" : "fork.knife" }
+    var symbol: String {
+        switch self { case .water: return "drop.fill"; case .quick: return "bell.fill"; case .meeting: return "calendar"; default: return "fork.knife" }
+    }
     var message: String {
         switch self {
         case .water: return "Time for a water break."
         case .breakfast: return "Take a moment for breakfast."
         case .lunch: return "Step away and enjoy lunch."
         case .dinner: return "Wrap up for a dinner break."
+        case .quick: return "Your reminder is due."
+        case .meeting: return "Your calendar meeting is coming up."
         }
     }
 }
@@ -25,7 +29,7 @@ struct Preferences: Codable {
     var name = "My buddy"
     var photo: Data? = nil
     func time(for kind: ReminderKind) -> Int {
-        switch kind { case .breakfast: return breakfast; case .lunch: return lunch; case .dinner: return dinner; case .water: return 0 }
+        switch kind { case .breakfast: return breakfast; case .lunch: return lunch; case .dinner: return dinner; case .water, .quick, .meeting: return 0 }
     }
 }
 

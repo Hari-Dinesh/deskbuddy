@@ -105,29 +105,33 @@ struct CompanionView: View {
         VStack(spacing: 0) {
             if let reminder = model.reminder, model.phase != .entering, !model.phase.departing {
                 VStack(spacing: 8) {
-                    Label(model.phase == .celebrating ? "Nice! Take care of yourself." : model.phase == .reacting ? "Okay, I'll check in later!" : reminder.title + " break", systemImage: model.phase == .celebrating ? "checkmark.circle.fill" : reminder.symbol).font(.headline)
+                    Label(model.phase == .celebrating ? (model.scheduledReminderID == nil ? "Nice! Take care of yourself." : "All set.") : model.phase == .reacting ? "Okay, I'll check in later!" : model.alertTitle, systemImage: model.phase == .celebrating ? "checkmark.circle.fill" : reminder.symbol).font(.headline).lineLimit(2)
                     if model.phase.interactive {
-                        Text(reminder.message).font(.callout).multilineTextAlignment(.center)
+                        Text(model.alertMessage).lineLimit(3).font(.callout).multilineTextAlignment(.center)
                         HStack {
-                            Button("Yes, I did") { model.done(reminder) }.buttonStyle(.borderedProminent).tint(.teal)
+                            Button(reminder == .meeting ? "Dismiss" : reminder == .quick ? "Done" : "Yes, I did") { model.done(reminder) }.buttonStyle(.borderedProminent).tint(.teal)
                             Button("Not yet") { model.snooze() }.buttonStyle(.bordered).help("Snooze for 10 minutes")
                         }
-                        Text("Not yet → remind me in 10 min").font(.system(size: 10)).foregroundStyle(.secondary)
+                        if let item = model.scheduledReminder, item.joinURL != nil {
+                            Button("Open meeting") { model.workspace.open(item.joinURL) }
+                        }
+                        Text(reminder == .meeting ? "Not yet → remind me in 1 min" : "Not yet → remind me in 10 min").font(.system(size: 10)).foregroundStyle(.secondary)
                     }
-                }.padding(14).frame(width: 240).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
-                BubbleTail().fill(.regularMaterial).frame(width: 240, height: 10)
+                }.padding(14).frame(width: 280).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
+                BubbleTail().fill(.regularMaterial).frame(width: 280, height: 10)
             }
             Spacer(minLength: 0)
             Avatar(model: model, animated: true)
                 .help("Drag to move · double-click for settings · right-click for actions")
                 .onTapGesture(count: 2) { model.showSettings?() }
                 .contextMenu {
+                    Button("Notes, reminders & calendar…") { model.showWorkspace?() }
                     Button("Settings…") { model.showSettings?() }
                     Button("I had water") { model.done(.water) }
                     Button("Quiet for 1 hour") { model.pause() }
                     Button("Hide buddy") { model.toggleBuddy() }
                 }
-        }.padding(10).frame(width: model.reminder == nil ? 144 : 260, height: model.reminder == nil ? 174 : 306)
+        }.padding(10).frame(width: model.reminder == nil ? 144 : 300, height: model.reminder == nil ? 174 : 360)
     }
 }
 
@@ -143,6 +147,9 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 5) { Text("A little care, while you work.").font(.title2.bold()); Text("DeskBuddy \(AppInfo.version) · local desktop companion").foregroundStyle(.secondary) }
             }
             Form {
+                Section("Your workspace") {
+                    Button("Notes, reminders & calendar…") { model.showWorkspace?() }
+                }
                 Section("Your avatar") {
                     TextField("Name", text: $model.preferences.name)
                     HStack { Button("Import custom avatar…") { model.importAvatar() }; Button("Reset to robot") { model.resetAvatar() } }

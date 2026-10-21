@@ -11,3 +11,8 @@
 *.key
 *.mobileprovision
 
+
+workspace.json
+tokens.json
+oauth-cache.json
+*.log

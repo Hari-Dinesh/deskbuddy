@@ -2,6 +2,11 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 version=$(cat VERSION)
+client_id=${DESKBUDDY_MICROSOFT_CLIENT_ID:-}
+if [[ -n "$client_id" && ! "$client_id" =~ ^[a-fA-F0-9-]{36}$ ]]; then
+  echo "DESKBUDDY_MICROSOFT_CLIENT_ID must be a public UUID client identifier, not a secret." >&2
+  exit 1
+fi
 sdk=${DESKBUDDY_SDK:-$(xcrun --show-sdk-path)}
 if [[ -z "${DESKBUDDY_SDK:-}" && -d /Library/Developer/CommandLineTools/SDKs/MacOSX15.5.sdk ]]; then
   sdk=/Library/Developer/CommandLineTools/SDKs/MacOSX15.5.sdk
@@ -12,7 +17,7 @@ if [[ "${1:-}" == "--universal" ]]; then architectures=(arm64 x86_64); fi
 binaries=()
 for architecture in "${architectures[@]}"; do
   binary=".build/DeskBuddy-$architecture"
-  xcrun swiftc Sources/*.swift -sdk "$sdk" -target "$architecture-apple-macos13.0" -module-cache-path .build/cache -framework AppKit -framework SwiftUI -framework CoreGraphics -framework ServiceManagement -o "$binary"
+  xcrun swiftc Sources/*.swift -sdk "$sdk" -target "$architecture-apple-macos13.0" -module-cache-path .build/cache -framework AppKit -framework SwiftUI -framework CoreGraphics -framework ServiceManagement -framework Security -o "$binary"
   binaries+=("$binary")
 done
 if [[ ${#binaries[@]} -eq 2 ]]; then
@@ -33,6 +38,7 @@ cat > .build/DeskBuddy.app/Contents/Info.plist <<PLIST
 <key>LSMinimumSystemVersion</key><string>13.0</string>
 <key>LSUIElement</key><true/>
 <key>NSHighResolutionCapable</key><true/>
+<key>DeskBuddyMicrosoftClientID</key><string>$client_id</string>
 </dict></plist>
 PLIST
 codesign --force --sign "${DESKBUDDY_SIGN_IDENTITY:--}" .build/DeskBuddy.app

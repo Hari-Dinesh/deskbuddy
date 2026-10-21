@@ -1,6 +1,6 @@
 import Foundation
 
-/// Boundary for future opt-in calendar / meeting providers. No provider is bundled.
+/// Generic boundary for opt-in calendar / meeting providers. Microsoft transport is implemented in MicrosoftCalendar.swift.
 struct IntegrationEvent: Equatable, Sendable {
     let providerID: String
     let externalID: String

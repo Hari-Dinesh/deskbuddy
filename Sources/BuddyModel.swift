@@ -3,6 +3,7 @@ import SwiftUI
 import CoreGraphics
 import UniformTypeIdentifiers
 import ServiceManagement
+import Combine
 
 final class BuddyPanel: NSPanel {
     override var canBecomeKey: Bool { true }
@@ -10,6 +11,16 @@ final class BuddyPanel: NSPanel {
 }
 
 final class BuddyModel: ObservableObject {
+    let workspace = WorkspaceModel()
+    private var workspaceChanges: AnyCancellable?
+    @Published var scheduledReminderID: UUID?
+    var scheduledReminder: ScheduledReminder? { workspace.data.reminders.first { $0.id == scheduledReminderID } }
+    var alertTitle: String { scheduledReminder?.title ?? ((reminder?.title ?? "") + " break") }
+    var alertMessage: String {
+        guard let item = scheduledReminder else { return reminder?.message ?? "" }
+        if let start = item.meetingStart { return "Meeting at " + start.formatted(date: .omitted, time: .shortened) }
+        return "Due " + item.dueAt.formatted(date: .omitted, time: .shortened)
+    }
     @Published var preferences: Preferences
     @Published var engine: ReminderEngine
     @Published var reminder: ReminderKind? { didSet { resizePanel() } }
@@ -36,17 +47,19 @@ final class BuddyModel: ObservableObject {
     var timer: Timer?
     var showSettings: (() -> Void)?
     var showPreview: (() -> Void)?
+    var showWorkspace: (() -> Void)?
     var panel: BuddyPanel?
     private let defaults = UserDefaults.standard
     init() {
         preferences = defaults.data(forKey: "preferences").flatMap { try? JSONDecoder().decode(Preferences.self, from: $0) } ?? Preferences()
         engine = defaults.data(forKey: "engine").flatMap { try? JSONDecoder().decode(ReminderEngine.self, from: $0) } ?? ReminderEngine()
         engine.rollDay(Date())
+        workspaceChanges = workspace.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }
     }
     func resizePanel() {
         guard let panel else { return }
         let old = panel.frame
-        let size = reminder == nil ? NSSize(width: 144, height: 174) : NSSize(width: 260, height: 306)
+        let size = reminder == nil ? NSSize(width: 144, height: 174) : NSSize(width: 300, height: 360)
         panel.setFrame(NSRect(x: old.maxX - size.width, y: old.minY, width: size.width, height: size.height), display: true)
     }
     var responding: Bool { phase == .celebrating || phase == .reacting || phase.departing }
@@ -127,6 +140,7 @@ final class BuddyModel: ObservableObject {
         phase = .idle; spriteIndex = nil; sceneProgress = 0
         previewing = false
         reminder = nil
+        scheduledReminderID = nil
         if hide { hidden = true; panel?.orderOut(nil) }
     }
     func save() {
@@ -154,8 +168,18 @@ final class BuddyModel: ObservableObject {
         let paused = (pausedUntil ?? .distantPast) > now
         let active = !sleeping && !paused && idle < Double(preferences.idleMinutes * 60)
         status = sleeping ? "Resting with your Mac" : paused ? "Quiet until \(pausedUntil!.formatted(date: .omitted, time: .shortened))" : active ? "Counting active work time" : "Away · water timer paused"
+        if !sleeping { workspace.sync() }
+        if !responding, let id = scheduledReminderID {
+            let item = workspace.data.reminders.first { $0.id == id }
+            if item == nil || item?.completedAt != nil || (item?.expiresAt ?? .distantFuture) <= now { cancelScene(hide: true) }
+        }
         if reminder == nil {
-            if let next = engine.tick(now: now, elapsed: elapsed, active: active, preferences: preferences) {
+            if !sleeping && !paused, let item = workspace.data.nextDue(now: now) {
+                present(item.kind == .meeting ? .meeting : .quick)
+                scheduledReminderID = item.id
+                workspace.markDelivered(item.id)
+                if preferences.sound { NSSound(named: "Glass")?.play() }
+            } else if let next = engine.tick(now: now, elapsed: elapsed, active: active && workspace.data.meetingQuietUntil(now: now) == nil, preferences: preferences) {
                 present(next)
                 if preferences.sound { NSSound(named: "Glass")?.play() }
             }
@@ -168,12 +192,18 @@ final class BuddyModel: ObservableObject {
     }
     func done(_ kind: ReminderKind) {
         guard !responding else { return }
-        if !previewing { engine.done(kind, now: Date()); save() }
+        if !previewing {
+            if let id = scheduledReminderID, reminder == kind { guard workspace.complete(id) else { return } }
+            else if kind != .quick && kind != .meeting { engine.done(kind, now: Date()); save() }
+        }
         if reminder == kind { startPhase(.celebrating) }
     }
     func snooze() {
         guard !responding, let reminder else { return }
-        if !previewing { engine.snooze(reminder, now: Date()); save() }
+        if !previewing {
+            if let id = scheduledReminderID { guard workspace.snooze(id) else { return } }
+            else { engine.snooze(reminder, now: Date()); save() }
+        }
         startPhase(.reacting)
     }
     func pause() { pausedUntil = Date().addingTimeInterval(3600); cancelScene(); tick() }
@@ -181,7 +211,10 @@ final class BuddyModel: ObservableObject {
     func toggleBuddy() {
         if hidden { hidden = false; panel?.orderFrontRegardless() }
         else {
-            if let reminder, !responding, !previewing { engine.snooze(reminder, now: Date()); save() }
+            if let reminder, !responding, !previewing {
+                if let id = scheduledReminderID { workspace.snooze(id) }
+                else { engine.snooze(reminder, now: Date()); save() }
+            }
             cancelScene(hide: true)
         }
     }
