@@ -19,7 +19,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.contentView = NSHostingView(rootView: CompanionView(model: model))
         panel.setFrameAutosaveName("DeskBuddyPosition")
         if !panel.setFrameUsingName("DeskBuddyPosition"), let frame = NSScreen.main?.visibleFrame { panel.setFrameOrigin(NSPoint(x: frame.maxX - 174, y: frame.minY + 35)) }
-        model.panel = panel; model.resizePanel(); panel.orderFrontRegardless()
+        model.panel = panel; model.resizePanel()
+        if let screen = NSScreen.screens.first(where: { $0.visibleFrame.intersects(panel.frame) }) ?? NSScreen.main {
+            var restored = panel.frame; let visible = screen.visibleFrame
+            restored.origin.x = min(max(restored.minX, visible.minX), visible.maxX - restored.width)
+            restored.origin.y = min(max(restored.minY, visible.minY), visible.maxY - restored.height)
+            panel.setFrame(restored, display: true)
+        }
+        panel.orderFrontRegardless()
         settingsWindow = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 530, height: 740), styleMask: [.titled, .closable], backing: .buffered, defer: false)
         settingsWindow.title = "DeskBuddy — Settings"; settingsWindow.isReleasedWhenClosed = false
         settingsWindow.contentView = NSHostingView(rootView: SettingsView(model: model)); settingsWindow.center()

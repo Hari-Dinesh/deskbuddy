@@ -21,3 +21,6 @@ xcrun swiftc Sources/WorkspaceData.swift Sources/MicrosoftCalendar.swift Tests/M
 .build/microsoft-tests
 xcrun swiftc Sources/WorkspaceData.swift Sources/MicrosoftCalendar.swift Sources/WorkspaceModel.swift Tests/WorkspaceModelTests.swift -sdk "$sdk" -module-cache-path .build/cache -framework Security -framework AppKit -framework SwiftUI -o .build/workspace-model-tests
 .build/workspace-model-tests
+xcrun swiftc Sources/ReminderEngine.swift Sources/ProfileUpgrade.swift Sources/AvatarFiles.swift Sources/CharacterSprites.swift Tests/ProfileUpgradeTests.swift -sdk "$sdk" -module-cache-path .build/cache -framework AppKit -o .build/profile-upgrade-tests
+.build/profile-upgrade-tests
+bash Tests/InstallerTests.sh "$fixtures"

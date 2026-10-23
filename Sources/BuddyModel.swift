@@ -49,10 +49,26 @@ final class BuddyModel: ObservableObject {
     var showPreview: (() -> Void)?
     var showWorkspace: (() -> Void)?
     var panel: BuddyPanel?
+    @Published var storageNotice = UserDefaults.standard.string(forKey: "profileRecoveryNotice") ?? ""
+    private var preferencesWritable = true
+    private var engineWritable = true
     private let defaults = UserDefaults.standard
     init() {
-        preferences = defaults.data(forKey: "preferences").flatMap { try? JSONDecoder().decode(Preferences.self, from: $0) } ?? Preferences()
-        engine = defaults.data(forKey: "engine").flatMap { try? JSONDecoder().decode(ReminderEngine.self, from: $0) } ?? ReminderEngine()
+        preferences = Preferences(); engine = ReminderEngine()
+        if defaults.object(forKey: "preferences") != nil && !(defaults.object(forKey: "preferences") is Data) {
+            preferencesWritable = false; storageNotice = "Saved preferences have an unsupported format. The original was preserved."
+        }
+        if defaults.object(forKey: "engine") != nil && !(defaults.object(forKey: "engine") is Data) {
+            engineWritable = false; storageNotice = "Saved reminder state has an unsupported format. The original was preserved."
+        }
+        if let data = defaults.data(forKey: "preferences") {
+            do { preferences = try JSONDecoder().decode(Preferences.self, from: data) }
+            catch { preferencesWritable = false; storageNotice = "Saved preferences could not be read. The original was preserved; restore from a settings backup." }
+        }
+        if let data = defaults.data(forKey: "engine") {
+            do { engine = try JSONDecoder().decode(ReminderEngine.self, from: data) }
+            catch { engineWritable = false; storageNotice = "Saved reminder state could not be read. The original was preserved." }
+        }
         engine.rollDay(Date())
         workspaceChanges = workspace.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }
     }
@@ -144,8 +160,8 @@ final class BuddyModel: ObservableObject {
         if hide { hidden = true; panel?.orderOut(nil) }
     }
     func save() {
-        defaults.set(try? JSONEncoder().encode(preferences), forKey: "preferences")
-        defaults.set(try? JSONEncoder().encode(engine), forKey: "engine")
+        if preferencesWritable { defaults.set(try? JSONEncoder().encode(preferences), forKey: "preferences") }
+        if engineWritable { defaults.set(try? JSONEncoder().encode(engine), forKey: "engine") }
     }
     func start() {
         let center = NSWorkspace.shared.notificationCenter
@@ -220,6 +236,21 @@ final class BuddyModel: ObservableObject {
     }
     @Published var avatarRevision = 0
     @Published var avatarError = ""
+    func backUpSetup() {
+        do {
+            save()
+            let current = defaults.persistentDomain(forName: ProfileUpgrade.currentDomain) ?? [:]
+            let previous = defaults.persistentDomain(forName: ProfileUpgrade.legacyDomain) ?? [:]
+            let folder = try ProfileUpgrade.backup(current: current, legacy: previous)
+            storageNotice = "Backup created: " + folder.lastPathComponent + ". Notes and avatars included; Microsoft tokens remain in Keychain."
+        } catch { storageNotice = "Backup failed: " + error.localizedDescription }
+    }
+    func recoverPreviousSetup() {
+        cancelScene()
+        storageNotice = ProfileUpgrade.run(force: true)
+        if let data = defaults.data(forKey: "preferences"), let recovered = try? JSONDecoder().decode(Preferences.self, from: data) { preferences = recovered; preferencesWritable = true }
+        CharacterSprites.reload(); avatarRevision += 1
+    }
     func importAvatar() {
         NSApp.activate(ignoringOtherApps: true)
         let chooser = NSOpenPanel()
@@ -229,12 +260,12 @@ final class BuddyModel: ObservableObject {
             do {
                 try AvatarFiles.install(from: url)
                 CharacterSprites.reload()
-                preferences.photo = nil; avatarRevision += 1; avatarError = ""; save()
+                preferences.photo = nil; avatarRevision += 1; avatarError = ""; defaults.set(1, forKey: ProfileUpgrade.avatarMarker); save()
             } catch { avatarError = error.localizedDescription }
         }
     }
     func resetAvatar() {
-        do { try AvatarFiles.reset(); CharacterSprites.reload(); preferences.photo = nil; avatarRevision += 1; avatarError = ""; save() }
+        do { try AvatarFiles.reset(); CharacterSprites.reload(); preferences.photo = nil; avatarRevision += 1; avatarError = ""; defaults.set(1, forKey: ProfileUpgrade.avatarMarker); save() }
         catch { avatarError = error.localizedDescription }
     }
     func pickPhoto() {

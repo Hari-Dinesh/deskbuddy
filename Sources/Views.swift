@@ -147,6 +147,11 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 5) { Text("A little care, while you work.").font(.title2.bold()); Text("DeskBuddy \(AppInfo.version) · local desktop companion").foregroundStyle(.secondary) }
             }
             Form {
+                Section("Your saved setup") {
+                    Text("Updates keep your name, schedules, avatar and notes. Earlier app profiles are recovered once when the new profile is still at defaults.").font(.caption).foregroundStyle(.secondary)
+                    HStack { Button("Back up setup") { model.backUpSetup() }; Button("Recover previous setup") { model.recoverPreviousSetup() } }
+                    if !model.storageNotice.isEmpty { Text(model.storageNotice).font(.caption).foregroundStyle(.secondary).textSelection(.enabled) }
+                }
                 Section("Your workspace") {
                     Button("Notes, reminders & calendar…") { model.showWorkspace?() }
                 }

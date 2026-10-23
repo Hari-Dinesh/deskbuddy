@@ -28,6 +28,20 @@ struct Preferences: Codable {
     var sound = false
     var name = "My buddy"
     var photo: Data? = nil
+    init() { }
+    enum CodingKeys: String, CodingKey { case waterMinutes, idleMinutes, breakfast, lunch, dinner, mealsEnabled, sound, name, photo }
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        waterMinutes = min(180, max(5, try values.decodeIfPresent(Int.self, forKey: .waterMinutes) ?? 45))
+        idleMinutes = min(30, max(1, try values.decodeIfPresent(Int.self, forKey: .idleMinutes) ?? 5))
+        breakfast = min(1439, max(0, try values.decodeIfPresent(Int.self, forKey: .breakfast) ?? 540))
+        lunch = min(1439, max(0, try values.decodeIfPresent(Int.self, forKey: .lunch) ?? 780))
+        dinner = min(1439, max(0, try values.decodeIfPresent(Int.self, forKey: .dinner) ?? 1200))
+        mealsEnabled = try values.decodeIfPresent(Bool.self, forKey: .mealsEnabled) ?? true
+        sound = try values.decodeIfPresent(Bool.self, forKey: .sound) ?? false
+        name = try values.decodeIfPresent(String.self, forKey: .name) ?? "My buddy"
+        photo = try values.decodeIfPresent(Data.self, forKey: .photo)
+    }
     func time(for kind: ReminderKind) -> Int {
         switch kind { case .breakfast: return breakfast; case .lunch: return lunch; case .dinner: return dinner; case .water, .quick, .meeting: return 0 }
     }
@@ -40,6 +54,17 @@ struct ReminderEngine: Codable {
     var snoozes: [ReminderKind: Date] = [:]
     var waterCount = 0
     var lastPresented: Date? = nil
+    init() { }
+    enum CodingKeys: String, CodingKey { case activeSeconds, day, completed, snoozes, waterCount, lastPresented }
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        activeSeconds = max(0, try values.decodeIfPresent(Double.self, forKey: .activeSeconds) ?? 0)
+        day = try values.decodeIfPresent(String.self, forKey: .day) ?? ""
+        completed = try values.decodeIfPresent(Set<ReminderKind>.self, forKey: .completed) ?? []
+        snoozes = try values.decodeIfPresent([ReminderKind: Date].self, forKey: .snoozes) ?? [:]
+        waterCount = max(0, try values.decodeIfPresent(Int.self, forKey: .waterCount) ?? 0)
+        lastPresented = try values.decodeIfPresent(Date.self, forKey: .lastPresented)
+    }
 
     mutating func rollDay(_ now: Date, calendar: Calendar = .current) {
         let c = calendar.dateComponents([.year, .month, .day], from: now)

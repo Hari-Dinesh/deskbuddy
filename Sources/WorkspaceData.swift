@@ -26,6 +26,16 @@ struct MicrosoftSettings: Codable, Equatable {
     var enabled = false
     var leadMinutes = 5
     var quietDuringMeetings = true
+    init() { }
+    enum CodingKeys: String, CodingKey { case clientID, tenant, enabled, leadMinutes, quietDuringMeetings }
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        clientID = try values.decodeIfPresent(String.self, forKey: .clientID) ?? ""
+        tenant = try values.decodeIfPresent(String.self, forKey: .tenant) ?? "organizations"
+        enabled = try values.decodeIfPresent(Bool.self, forKey: .enabled) ?? false
+        leadMinutes = min(30, max(1, try values.decodeIfPresent(Int.self, forKey: .leadMinutes) ?? 5))
+        quietDuringMeetings = try values.decodeIfPresent(Bool.self, forKey: .quietDuringMeetings) ?? true
+    }
     var credentialAccount: String { tenant.lowercased() + ":" + clientID.lowercased() }
     var valid: Bool { UUID(uuidString: clientID) != nil && (tenant == "organizations" || tenant == "common" || UUID(uuidString: tenant) != nil) }
 }
@@ -40,9 +50,22 @@ struct CalendarMeeting: Equatable, Sendable {
 }
 
 struct WorkspaceData: Codable {
+    var schemaVersion = 1
     var notes: [QuickNote] = []
     var reminders: [ScheduledReminder] = []
     var microsoft = MicrosoftSettings()
+    init() { }
+    enum CodingKeys: String, CodingKey { case schemaVersion, notes, reminders, microsoft }
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        schemaVersion = try values.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? 1
+        guard schemaVersion == 1 else {
+            throw DecodingError.dataCorruptedError(forKey: .schemaVersion, in: values, debugDescription: "This workspace requires a newer DeskBuddy version. Original data was preserved.")
+        }
+        notes = try values.decodeIfPresent([QuickNote].self, forKey: .notes) ?? []
+        reminders = try values.decodeIfPresent([ScheduledReminder].self, forKey: .reminders) ?? []
+        microsoft = try values.decodeIfPresent(MicrosoftSettings.self, forKey: .microsoft) ?? MicrosoftSettings()
+    }
 
     mutating func mergeMeetings(_ meetings: [CalendarMeeting], now: Date) {
         let existing = Dictionary(reminders.filter { $0.kind == .meeting }.compactMap { item in item.sourceID.map { ($0, item) } }, uniquingKeysWith: { first, _ in first })

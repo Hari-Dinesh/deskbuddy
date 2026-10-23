@@ -45,6 +45,13 @@ import Foundation
         precondition(data.reminders.contains { $0.id == quick.id }, "Sync never removes local reminders")
         print("PASS calendar merge, reschedule, cancellation, quiet windows and disconnect gating")
 
+        var object = try JSONSerialization.jsonObject(with: JSONEncoder().encode(data)) as! [String: Any]
+        object.removeValue(forKey: "schemaVersion"); object.removeValue(forKey: "microsoft")
+        let legacyWorkspace = try JSONDecoder().decode(WorkspaceData.self, from: JSONSerialization.data(withJSONObject: object))
+        precondition(legacyWorkspace.notes.count == 1 && legacyWorkspace.notes[0].text == "A local note")
+        object["schemaVersion"] = 99
+        do { _ = try JSONDecoder().decode(WorkspaceData.self, from: JSONSerialization.data(withJSONObject: object)); preconditionFailure("Future schema must be preserved, not downgraded") } catch { }
+        print("PASS legacy workspace defaults and future-schema protection")
         try Data("not JSON".utf8).write(to: persistence.url)
         do { _ = try persistence.load(); preconditionFailure("Corruption should be surfaced") } catch { }
         let retained = try Data(contentsOf: persistence.url)

@@ -9,12 +9,12 @@ A small native macOS companion for water and meal breaks, quick notes, one-off r
 No Xcode, Node.js, Python, sudo, account or API key is needed for the prebuilt app.
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/Hari-Dinesh/deskbuddy/v2.1.0/scripts/install.sh -o /tmp/deskbuddy-install.sh
-bash /tmp/deskbuddy-install.sh --version v2.1.0
+curl -fsSL https://raw.githubusercontent.com/Hari-Dinesh/deskbuddy/v2.1.1/scripts/install.sh -o /tmp/deskbuddy-install.sh
+bash /tmp/deskbuddy-install.sh --version v2.1.1
 open "$HOME/Applications/DeskBuddy.app"
 ```
 
-You can inspect the downloaded script before executing it. The installer downloads a universal release, verifies its SHA-256 checksum and code signature, then installs into `~/Applications`. It leaves your preferences and custom avatar in place on updates. Quit DeskBuddy before updating; the installer does not terminate running applications.
+You can inspect the downloaded script before executing it. The installer downloads a universal release, verifies its SHA-256 checksum and code signature, then installs into `~/Applications`. It keeps preferences, notes and custom avatars outside the app bundle. Before updates it backs up user data and the previous app under `~/Library/Application Support/DeskBuddy/Backups`. Save your notes and quit DeskBuddy before updating: the installer refuses to replace a running app, refuses downgrades, and does not terminate applications. If process inspection is restricted, run the installer from your normal macOS Terminal.
 
 This release is **ad-hoc signed, not Apple notarized**. Some Macs or organization policies may block it. Where permitted, use Apple's normal Privacy & Security → Open Anyway process; the installer does not remove quarantine or disable Gatekeeper. Source builds are also available below. Windows and Linux are not supported.
 
@@ -34,6 +34,18 @@ Find the drop icon in the menu bar → Settings or Preview animation.
 - Open at login is optional and can require macOS approval.
 
 The public release defaults to a locally drawn robot. **No contributor's personal photo or avatar is included.** Custom eight-pose cartoon avatars are supported.
+
+## Settings and avatar recovery after an update
+
+v2.1.1 repairs the transition from the original private app (`local.dinesh.DeskBuddy`) to the stable public identity (`io.github.hari-dinesh.deskbuddy`). The original public migration had no profile handoff, so macOS showed defaults even though the old preferences remained saved.
+
+- Startup backs up both profiles before migration. If the current profile is absent or still at factory defaults, a customized legacy profile is recovered once. Existing non-default public settings and newer reminder state/window placement are preserved.
+- The installer can upgrade a recognized original app and stage its bundled personal avatar for recovery. A current custom avatar is never replaced. Explicitly importing/resetting an avatar prevents later automatic re-import.
+- Settings → **Your saved setup** shows the recovery status and has **Back up setup** / **Recover previous setup** actions. Local backups include notes, preferences and custom images; Microsoft Keychain tokens are not exported.
+- Missing fields in older settings/workspace JSON use compatible defaults. Corrupt data and unknown future workspace schemas are preserved and reported rather than overwritten with empty settings.
+- Keep the app's public bundle ID stable in future releases. Quit old app copies before starting the updated version. macOS login-item registration/permissions may need approval again when moving from the old identity. Daily water/meal counters still reset by date; they are not a historical activity database.
+
+For original avatar assets kept elsewhere, import their `idle.png` / `animation-sheet.png` folder through Settings. Advanced local recovery staging can be compiled from `Tools/PrepareRecovery.swift`; it makes a backup and stages images without modifying live preferences. No personal images are included in this repository.
 
 ## Quick notes, reminders and Teams calendar
 

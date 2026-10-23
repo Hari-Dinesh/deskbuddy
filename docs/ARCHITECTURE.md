@@ -11,6 +11,7 @@ Swift is the language; SwiftUI is the view framework. This is one native process
 | ReminderEngine.swift | Pure reminder selection, completion and snooze rules |
 | CompanionScene.swift | Scene states, pose indexes and easing |
 | CharacterSprites.swift | Cached sprite decoding |
+| ProfileUpgrade.swift | One-time legacy-profile recovery, local backups and safe avatar migration |
 | AvatarFiles.swift | Validated custom-avatar install with rollback |
 | Integrations.swift | Generic provider contract and opt-in quiet-time policy |
 | WorkspaceData.swift | Durable notes, scheduled alerts, calendar occurrence merge and due selection |
@@ -25,3 +26,5 @@ Preferences use UserDefaults under the app bundle identifier. Custom images are 
 Tests exercise deterministic reminder rules, scene transitions, sprite bounds, generated transparent test fixtures, safe avatar replacement and integration opt-in policy. Compilation is separate from real GUI/device validation. An ad-hoc signature confirms bundle integrity, not Apple Developer ID trust or notarization.
 
 Workspace state is atomically written to owner-only JSON. The Microsoft client is injectable through URLSession for deterministic transport tests. Calendar sync is independent from animation, bounded/paginated, generation-guarded on disconnect, and rate-limit aware. Notes do not enter Microsoft requests. Avatar scheduled alerts share the original single-scene coordinator and preserve their durable completion/snooze state.
+
+Updates must keep the public bundle ID stable. `ProfileUpgrade.run` executes before the model reads preferences. It recovers only an absent/default current profile, keeps non-default current choices, snapshots both domains/workspace first, and never deletes the legacy preference domain. The installer requires the app to be closed and retains old app/data backups. Workspace schema version 1 accepts missing older fields but rejects unknown future schemas without overwriting the source.
